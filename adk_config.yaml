@@ -1,0 +1,4 @@
+agents:
+  - name: financial_coordinator
+    module: agent.agent
+    agent: root_agent
