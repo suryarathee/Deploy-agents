@@ -1,1 +1,1 @@
-docker run -p 8001:8082 deploy-agents
+docker run -d --env-file ./.env -p 8001:8082 -p 8085:8085 deploy-agents
