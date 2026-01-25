@@ -22,7 +22,7 @@ financial_coordinator = LlmAgent(
         "execution plans, and evaluate the overall risk."
     ),
     #
-    instruction=prompt.TEST_PROMPT,
+    instruction=prompt.FINANCIAL_COORDINATOR_PROMPT,
     output_key="financial_coordinator_output",
     tools=[
         AgentTool(agent=data_analyst_agent),

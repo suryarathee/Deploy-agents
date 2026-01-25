@@ -10,18 +10,14 @@ from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 from typing import Optional
 
-# ✅ CONFIGURATION
-# Uses environment variable for Docker, defaults to localhost for local testing
 ADK_AGENT_URL = os.getenv("ADK_AGENT_URL", "http://localhost:8085")
 
 app = FastAPI()
 
-# ✅ Simple In-Memory Storage (from your original file)
 task_results = {}
 task_lock = threading.Lock()
 
 
-# ✅ Pydantic Model for Input Validation
 class AgentRequest(BaseModel):
     newMessage: str
     userId: Optional[str] = None
@@ -43,7 +39,6 @@ def long_running_agent_task(task_id: str, payload: AgentRequest):
         session_id = payload.sessionId
         new_message = payload.newMessage
 
-        # ✅ STEP 1: Create/initialize session
         session_endpoint = f"{ADK_AGENT_URL}/apps/{app_name}/users/{user_id}/sessions/{session_id}"
 
         # Try to initialize session (ignore if already exists)
@@ -52,8 +47,7 @@ def long_running_agent_task(task_id: str, payload: AgentRequest):
         except Exception as e:
             print(f"[WARNING] Session init minor error: {e}")
 
-        # ✅ STEP 2: Run the agent with /run endpoint
-        # FIX: Format the message as a proper 'Turn' object for ADK
+        
         formatted_message = {
             "role": "user",
             "parts": [{"text": new_message}]

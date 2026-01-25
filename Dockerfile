@@ -1,30 +1,28 @@
-FROM python:3.13-slim
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
-# install supervisor for process management
+# 1. Install Supervisor (Process Manager)
 RUN apt-get update \
  && apt-get install -y --no-install-recommends supervisor \
  && rm -rf /var/lib/apt/lists/*
 
-# copy project
+# 2. Copy project files
 COPY . /app
 
-# Install Python deps
-RUN if [ -f "requirements.txt" ]; then \
-      pip install --no-cache-dir -r requirements.txt ; \
-    else \
-      pip install --no-cache-dir fastapi "uvicorn[standard]" requests pyyaml ; \
-      # try installing google-adk CLI package if available
-      pip install --no-cache-dir google-adk || true ; \
-    fi
+# 3. Install Python Dependencies
+# We use Python 3.11 and strictly require google-adk to ensure it installs correctly.
+RUN pip install --no-cache-dir fastapi "uvicorn[standard]" requests pyyaml google-adk
 
-# ✅ THE FIX: We added 'stdout_logfile_maxbytes=0' and 'stderr_logfile_maxbytes=0' to all sections.
-# This prevents Supervisor from trying to "seek" or rotate the Docker log stream.
+# 4. Create Supervisor Configuration
+# This runs BOTH the ADK Agent (port 8085) and FastAPI (port 8082) inside one container.
+# We also set logfile_maxbytes=0 to prevent Docker logging errors.
 RUN mkdir -p /var/log/supervisor \
  && printf "[supervisord]\nnodaemon=true\nlogfile=/var/log/supervisor/supervisord.log\npidfile=/var/run/supervisord.pid\n\n[program:adk]\ncommand=adk api_server --port 8085\ndirectory=/app\nautostart=true\nautorestart=true\nstdout_logfile=/dev/fd/1\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/fd/2\nstderr_logfile_maxbytes=0\n\n[program:fastapi]\ncommand=uvicorn main:app --host 0.0.0.0 --port 8082\ndirectory=/app\nautostart=true\nautorestart=true\nstdout_logfile=/dev/fd/1\nstdout_logfile_maxbytes=0\nstderr_logfile=/dev/fd/2\nstderr_logfile_maxbytes=0\n" > /etc/supervisord.conf
 
+# 5. Expose ports
 EXPOSE 8082 8085
 
+# 6. Start Supervisor
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]
