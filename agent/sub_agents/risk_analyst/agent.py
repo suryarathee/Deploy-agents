@@ -16,9 +16,8 @@
 
 from google.adk import Agent
 
+from ...config import MODEL
 from . import prompt
-
-MODEL="gemini-2.5-flash"
 
 risk_analyst_agent = Agent(
     model=MODEL,

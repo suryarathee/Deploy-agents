@@ -1,28 +1,38 @@
-# Copyright 2025 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+import os
+from dotenv import load_dotenv
+from google.adk import Agent  # Or LlmAgent based on your preference
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from mcp import StdioServerParameters
 
-"""Execution_analyst_agent for finding the ideal execution strategy"""
-
-from google.adk import Agent
-
+from ...config import MODEL
 from . import prompt
 
-MODEL="gemini-2.5-flash"
+# Load environment variables
+load_dotenv()
+ALPHA_VANTAGE_KEY = os.getenv("ALPHA_VANTAGE_KEY")
 
 trading_analyst_agent = Agent(
     model=MODEL,
     name="trading_analyst_agent",
     instruction=prompt.TRADING_ANALYST_PROMPT,
+    tools=[
+        McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command="npx",
+                    args=[
+                        "-y",
+                        "@alphavantage/mcp-server"
+                    ],
+                    # IMPORTANT: Alpha Vantage requires the API key in the environment
+                    env={
+                        "PATH": os.environ.get("PATH", ""), # Required for npx to find node
+                        "ALPHA_VANTAGE_API_KEY": ALPHA_VANTAGE_KEY
+                    }
+                )
+            )
+        )
+    ],
     output_key="proposed_trading_strategies_output",
 )

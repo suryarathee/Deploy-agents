@@ -69,6 +69,13 @@ higher potential reward scenarios (with commensurate risk).
 
 * Expected Output (from trading_analyst):
 
+** Live Data Integration:
+You have access to Alpha Vantage tools. Before formulating strategies, you MUST:
+1. Fetch the current price and recent performance for relevant tickers using 'get-stock-quote' or 'get-time-series'.
+2. Use 'get-company-info' to understand the fundamental health of the assets.
+3. Compare live data against the provided market_data_analysis_output to ensure strategies are timely.
+...
+
 ** Content: A collection containing five or more detailed potential trading strategies.
 ** Structure for Each Strategy: Each individual trading strategy within the collection MUST be clearly articulated and include at least the 
 following components:

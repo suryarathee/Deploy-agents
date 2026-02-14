@@ -1,30 +1,34 @@
-# Copyright 2025 Google LLC
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-"""data_analyst_agent for finding information using google search"""
-
-from google.adk import Agent
-from google.adk.tools import google_search
+import os
+from dotenv import load_dotenv
+from google.adk import Agent  # Or LlmAgent based on your preference
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from mcp import StdioServerParameters
 
 from . import prompt
 
-MODEL = "gemini-2.5-flash"
+from ...config import MODEL
+# Load environment variables
+load_dotenv()
+ALPHA_VANTAGE_KEY = os.getenv("ALPHA_VANTAGE_KEY")
 
 data_analyst_agent = Agent(
     model=MODEL,
     name="data_analyst_agent",
     instruction=prompt.DATA_ANALYST_PROMPT,
-    output_key="market_data_analysis_output",
-    tools=[google_search],
+    tools=[
+        McpToolset(
+            connection_params=StdioConnectionParams(
+                server_params=StdioServerParameters(
+                    command="uvx",  # Use uvx instead of npx
+                    args=[
+                        "av-mcp",  # This is the Alpha Vantage python-based MCP package
+                        os.getenv("ALPHA_VANTAGE_KEY")
+                    ],
+                    env=os.environ.copy()
+                )
+            )
+        )
+    ],
+    output_key="proposed_trading_strategies_output",
 )

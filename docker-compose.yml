@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  deploy-agents:
+    image: deploy-agents
+    container_name: deploy-agents
+    build: .
+    ports:
+      - "8082:8082"
+    env_file:
+      - .env
+    restart: unless-stopped
