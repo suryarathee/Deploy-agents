@@ -8,9 +8,8 @@ from google.adk.tools import google_search
 from . import prompt
 
 from ...config import MCP_MODEL
-# Load environment variables
 load_dotenv()
-ALPHA_VANTAGE_KEY = os.getenv("ALPHA_VANTAGE_KEY")
+ALPHAVANTAGE_API_KEY = os.getenv("ALPHAVANTAGE_API_KEY")
 
 data_analyst_agent = Agent(
     model=MCP_MODEL,
@@ -20,16 +19,12 @@ data_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="alphavantage-mcp",
-                    args=[],
-                    env={
-                        **os.environ.copy(),
-                        "ALPHAVANTAGE_API_KEY": os.getenv("ALPHA_VANTAGE_KEY"),
-                    }
+                    command="uvx",
+                    args=["av-mcp", ALPHAVANTAGE_API_KEY],
+                    env=os.environ.copy(),
                 )
             )
         )
-    ,
-    google_search],
+    ],
     output_key="proposed_trading_strategies_output",
 )

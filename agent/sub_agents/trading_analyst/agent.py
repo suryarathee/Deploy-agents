@@ -1,4 +1,6 @@
 import os
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 from google.adk import Agent
 from google.adk.tools.mcp_tool import McpToolset
@@ -8,9 +10,20 @@ from mcp import StdioServerParameters
 from ...config import MCP_MODEL
 from . import prompt
 
-# Load environment variables
-load_dotenv()
-ALPHA_VANTAGE_KEY = os.getenv("ALPHA_VANTAGE_KEY")
+# Load .env using an explicit path anchored to this file's location,
+# so it works regardless of the working directory when the module is imported.
+_env_path = Path(__file__).resolve().parents[3] / ".env"
+load_dotenv(dotenv_path=_env_path, override=True)
+
+# Support both ALPHAVANTAGE_API_KEY and ALPHA_VANTAGE_KEY names
+_api_key = os.getenv("ALPHAVANTAGE_API_KEY") or os.getenv("ALPHA_VANTAGE_KEY") or ""
+if not _api_key:
+    raise RuntimeError(
+        "ALPHAVANTAGE_API_KEY is not set. "
+        "Add it to your .env file or environment before starting the server."
+    )
+
+
 
 trading_analyst_agent = Agent(
     model=MCP_MODEL,
@@ -20,12 +33,9 @@ trading_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="alphavantage-mcp",
-                    args=[],
-                    env={
-                        **os.environ.copy(),
-                        "ALPHAVANTAGE_API_KEY": ALPHA_VANTAGE_KEY,
-                    }
+                    command="uvx",
+                    args=["av-mcp", _api_key],
+                    env=os.environ.copy(),
                 )
             )
         )

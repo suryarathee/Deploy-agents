@@ -3,9 +3,8 @@
 
 import uuid
 import asyncio
-import threading
 import os
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
@@ -39,7 +38,6 @@ app.add_middleware(
 )
 
 task_results: dict = {}
-task_lock = threading.Lock()
 
 
 # ── Request model ─────────────────────────────────────────────────────────────
@@ -78,14 +76,12 @@ async def run_agent_async(task_id: str, payload: AgentRequest):
 
         # Run the agent and collect events
         agent_message = None
-        all_events = []
 
         async for event in runner.run_async(
             user_id=user_id,
             session_id=session_id,
             new_message=content,
         ):
-            all_events.append(str(event))
             if event.is_final_response():
                 if event.content and event.content.parts:
                     for part in event.content.parts:
@@ -93,37 +89,25 @@ async def run_agent_async(task_id: str, payload: AgentRequest):
                             agent_message = part.text
                             break
 
-        with task_lock:
-            task_results[task_id] = {
-                "status": "SUCCESS",
-                "result": {
-                    "message": agent_message,
-                    "session_id": session_id,
-                    "user_id": user_id,
-                }
+        task_results[task_id] = {
+            "status": "SUCCESS",
+            "result": {
+                "message": agent_message,
+                "session_id": session_id,
+                "user_id": user_id,
             }
+        }
         print(f"[TASK COMPLETED] {task_id}")
 
     except Exception as e:
-        with task_lock:
-            task_results[task_id] = {"status": "FAILURE", "result": str(e)}
+        task_results[task_id] = {"status": "FAILURE", "result": str(e)}
         print(f"[TASK FAILED] {task_id} → {e}")
-
-
-def run_agent_in_thread(task_id: str, payload: AgentRequest):
-    """Run the async agent function in a dedicated event loop thread."""
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(run_agent_async(task_id, payload))
-    finally:
-        loop.close()
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @app.post("/chat")
-def start_task(payload: AgentRequest, background_tasks: BackgroundTasks):
+async def start_task(payload: AgentRequest):
     """Start an async agent run task."""
     task_id = str(uuid.uuid4())
 
@@ -132,10 +116,11 @@ def start_task(payload: AgentRequest, background_tasks: BackgroundTasks):
     if not payload.userId:
         payload.userId = str(uuid.uuid4())
 
-    with task_lock:
-        task_results[task_id] = {"status": "PENDING", "result": None}
+    task_results[task_id] = {"status": "PENDING", "result": None}
 
-    background_tasks.add_task(run_agent_in_thread, task_id, payload)
+    # Use asyncio.create_task so the MCP subprocess runs on the main event loop.
+    # This is required — StdioConnectionParams breaks when run in a new thread's loop.
+    asyncio.create_task(run_agent_async(task_id, payload))
 
     return {
         "task_id": task_id,
@@ -148,8 +133,7 @@ def start_task(payload: AgentRequest, background_tasks: BackgroundTasks):
 @app.get("/task/{task_id}")
 def get_task_status(task_id: str):
     """Get the status of a running task."""
-    with task_lock:
-        result = task_results.get(task_id)
+    result = task_results.get(task_id)
 
     if not result:
         raise HTTPException(status_code=404, detail="Task not found")
