@@ -1,127 +1,132 @@
-# main.py - FastAPI Task Manager (Simple In-Memory Version)
-# Run with: uvicorn main:app --host 0.0.0.0 --port 8082 --reload
+# main.py - FastAPI Task Manager using ADK SDK directly (no separate adk api_server needed)
+# Run with: uvicorn main:app --host 0.0.0.0 --port 8082
 
 import uuid
+import asyncio
 import threading
-import requests
 import os
-import json
 from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
 
-ADK_AGENT_URL = os.getenv("ADK_AGENT_URL", "http://localhost:8085")
+from google.adk.runners import Runner
+from google.adk.sessions import InMemorySessionService
+from google.genai import types
+
+from agent.agent import root_agent
+
+# ── App setup ────────────────────────────────────────────────────────────────
+
+APP_NAME = "financial_coordinator"
+
+session_service = InMemorySessionService()
+
+runner = Runner(
+    agent=root_agent,
+    app_name=APP_NAME,
+    session_service=session_service,
+)
 
 app = FastAPI()
 
-task_results = {}
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+task_results: dict = {}
 task_lock = threading.Lock()
 
+
+# ── Request model ─────────────────────────────────────────────────────────────
 
 class AgentRequest(BaseModel):
     newMessage: str
     userId: Optional[str] = None
     sessionId: Optional[str] = None
-    appName: str = "agent"
 
 
-def long_running_agent_task(task_id: str, payload: AgentRequest):
-    """
-    Execute an agent run using the correct ADK API flow.
-    """
+# ── Background task ───────────────────────────────────────────────────────────
+
+async def run_agent_async(task_id: str, payload: AgentRequest):
+    """Run the ADK agent in-process using the Runner SDK."""
     print(f"[TASK STARTED] {task_id}")
-    print(f"[WORKER] Connecting to ADK at: {ADK_AGENT_URL}")
+
+    user_id = payload.userId
+    session_id = payload.sessionId
+    new_message = payload.newMessage
 
     try:
-        # Extract parameters
-        app_name = payload.appName
-        user_id = payload.userId
-        session_id = payload.sessionId
-        new_message = payload.newMessage
+        # Create session if it doesn't exist
+        existing = await session_service.get_session(
+            app_name=APP_NAME, user_id=user_id, session_id=session_id
+        )
+        if existing is None:
+            await session_service.create_session(
+                app_name=APP_NAME, user_id=user_id, session_id=session_id
+            )
 
-        session_endpoint = f"{ADK_AGENT_URL}/apps/{app_name}/users/{user_id}/sessions/{session_id}"
-
-        # Try to initialize session (ignore if already exists)
-        try:
-            requests.post(session_endpoint, json={"state": {}}, timeout=5)
-        except Exception as e:
-            print(f"[WARNING] Session init minor error: {e}")
-
-        
-        formatted_message = {
-            "role": "user",
-            "parts": [{"text": new_message}]
-        }
-
-        run_endpoint = f"{ADK_AGENT_URL}/run"
-        run_payload = {
-            "app_name": app_name,
-            "user_id": user_id,
-            "session_id": session_id,
-            "new_message": formatted_message  # <-- Sending the object, not just string
-        }
-
-        print(f"[RUNNING AGENT] {run_endpoint}")
-
-        run_response = requests.post(
-            run_endpoint,
-            json=run_payload,
-            timeout=300
+        # Build the message content
+        content = types.Content(
+            role="user",
+            parts=[types.Part(text=new_message)]
         )
 
-        # Debugging helper for 422 errors
-        if run_response.status_code == 422:
-            print(f"[ADK ERROR 422] Response: {run_response.text}")
-
-        run_response.raise_for_status()
-
-        # Response is a JSON array of Event objects
-        events = run_response.json()
-        print(f"[RECEIVED {len(events)} EVENTS]")
-
-        # Extract the final agent response
+        # Run the agent and collect events
         agent_message = None
+        all_events = []
 
-        for event in reversed(events):
-            if event.get('content') and event['content'].get('parts'):
-                for part in event['content']['parts']:
-                    if part.get('text'):
-                        agent_message = part['text']
-                        break
-            if agent_message:
-                break
+        async for event in runner.run_async(
+            user_id=user_id,
+            session_id=session_id,
+            new_message=content,
+        ):
+            all_events.append(str(event))
+            if event.is_final_response():
+                if event.content and event.content.parts:
+                    for part in event.content.parts:
+                        if hasattr(part, "text") and part.text:
+                            agent_message = part.text
+                            break
 
-        # Save result to memory
         with task_lock:
             task_results[task_id] = {
                 "status": "SUCCESS",
                 "result": {
                     "message": agent_message,
-                    "all_events": events,
                     "session_id": session_id,
-                    "user_id": user_id
+                    "user_id": user_id,
                 }
             }
         print(f"[TASK COMPLETED] {task_id}")
 
-    except requests.exceptions.Timeout:
-        with task_lock:
-            task_results[task_id] = {"status": "TIMEOUT", "result": "Agent run exceeded timeout"}
-        print(f"[TASK TIMEOUT] {task_id}")
     except Exception as e:
         with task_lock:
             task_results[task_id] = {"status": "FAILURE", "result": str(e)}
         print(f"[TASK FAILED] {task_id} → {e}")
 
 
+def run_agent_in_thread(task_id: str, payload: AgentRequest):
+    """Run the async agent function in a dedicated event loop thread."""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(run_agent_async(task_id, payload))
+    finally:
+        loop.close()
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
 @app.post("/chat")
 def start_task(payload: AgentRequest, background_tasks: BackgroundTasks):
-    """
-    Start an async agent run task.
-    """
+    """Start an async agent run task."""
     task_id = str(uuid.uuid4())
 
-    # Generate IDs if missing
     if not payload.sessionId:
         payload.sessionId = str(uuid.uuid4())
     if not payload.userId:
@@ -130,7 +135,7 @@ def start_task(payload: AgentRequest, background_tasks: BackgroundTasks):
     with task_lock:
         task_results[task_id] = {"status": "PENDING", "result": None}
 
-    background_tasks.add_task(long_running_agent_task, task_id, payload)
+    background_tasks.add_task(run_agent_in_thread, task_id, payload)
 
     return {
         "task_id": task_id,
@@ -142,9 +147,7 @@ def start_task(payload: AgentRequest, background_tasks: BackgroundTasks):
 
 @app.get("/task/{task_id}")
 def get_task_status(task_id: str):
-    """
-    Get the status of a running task.
-    """
+    """Get the status of a running task."""
     with task_lock:
         result = task_results.get(task_id)
 
@@ -161,4 +164,4 @@ def get_task_status(task_id: str):
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "service": "ADK Task Manager"}
+    return {"status": "healthy", "service": "ADK Financial Coordinator"}
