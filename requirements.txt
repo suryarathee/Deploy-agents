@@ -2,4 +2,4 @@ fastapi
 uvicorn[standard]
 pyyaml
 google-adk
-av-mcp
+alphavantage-mcp

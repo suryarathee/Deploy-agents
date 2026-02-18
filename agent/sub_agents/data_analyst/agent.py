@@ -20,11 +20,12 @@ data_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="av-mcp",
-                    args=[
-                        os.getenv("ALPHA_VANTAGE_KEY")
-                    ],
-                    env=os.environ.copy()
+                    command="alphavantage-mcp",
+                    args=[],
+                    env={
+                        **os.environ.copy(),
+                        "ALPHAVANTAGE_API_KEY": os.getenv("ALPHA_VANTAGE_KEY"),
+                    }
                 )
             )
         )

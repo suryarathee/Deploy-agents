@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from google.adk import Agent  # Or LlmAgent based on your preference
+from google.adk import Agent
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from mcp import StdioServerParameters
@@ -20,11 +20,12 @@ trading_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="av-mcp",
-                    args=[
-                        ALPHA_VANTAGE_KEY
-                    ],
-                    env=os.environ.copy()
+                    command="alphavantage-mcp",
+                    args=[],
+                    env={
+                        **os.environ.copy(),
+                        "ALPHAVANTAGE_API_KEY": ALPHA_VANTAGE_KEY,
+                    }
                 )
             )
         )
