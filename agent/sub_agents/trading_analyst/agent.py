@@ -20,9 +20,8 @@ trading_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="uvx",
+                    command="av-mcp",
                     args=[
-                        "av-mcp",
                         ALPHA_VANTAGE_KEY
                     ],
                     env=os.environ.copy()

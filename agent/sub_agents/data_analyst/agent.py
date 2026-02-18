@@ -20,9 +20,8 @@ data_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="uvx",  # Use uvx instead of npx
+                    command="av-mcp",
                     args=[
-                        "av-mcp",  # This is the Alpha Vantage python-based MCP package
                         os.getenv("ALPHA_VANTAGE_KEY")
                     ],
                     env=os.environ.copy()
