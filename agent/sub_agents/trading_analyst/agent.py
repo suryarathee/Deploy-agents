@@ -20,16 +20,12 @@ trading_analyst_agent = Agent(
         McpToolset(
             connection_params=StdioConnectionParams(
                 server_params=StdioServerParameters(
-                    command="npx",
+                    command="uvx",
                     args=[
-                        "-y",
-                        "@alphavantage/mcp-server"
+                        "av-mcp",
+                        ALPHA_VANTAGE_KEY
                     ],
-                    # IMPORTANT: Alpha Vantage requires the API key in the environment
-                    env={
-                        "PATH": os.environ.get("PATH", ""), # Required for npx to find node
-                        "ALPHA_VANTAGE_API_KEY": ALPHA_VANTAGE_KEY
-                    }
+                    env=os.environ.copy()
                 )
             )
         )
