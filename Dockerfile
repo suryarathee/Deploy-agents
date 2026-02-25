@@ -5,8 +5,12 @@ WORKDIR /app
 
 # 1. Install Supervisor (Process Manager)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends supervisor \
+ && apt-get install -y --no-install-recommends supervisor curl \
  && rm -rf /var/lib/apt/lists/*
+
+# Install uv (provides the uvx command used by the MCP toolset)
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:$PATH"
 
 # 2. Copy project files
 COPY . /app
