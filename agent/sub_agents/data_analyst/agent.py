@@ -26,16 +26,16 @@ async def create_data_analyst_agent():
     Create a fresh data_analyst_agent with a live MCP toolset.
     Returns (agent, exit_stack) — caller must close the exit_stack when done.
     """
-    exit_stack = AsyncExitStack()
-    mcp_tools = await exit_stack.enter_async_context(
-        MCPToolset(
-            connection_params=StdioServerParameters(
-                command="uvx",
-                args=["av-mcp", _api_key],
-                env=os.environ.copy(),
-            )
+    mcp_tools = MCPToolset(
+        connection_params=StdioServerParameters(
+            command="uvx",
+            args=["av-mcp", _api_key],
+            env=os.environ.copy(),
         )
     )
+    
+    exit_stack = AsyncExitStack()
+    exit_stack.push_async_callback(mcp_tools.close)
 
     agent = Agent(
         model=MCP_MODEL,
