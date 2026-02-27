@@ -28,5 +28,4 @@ RUN mkdir -p /var/log/supervisor \
 # 5. Expose ports
 EXPOSE 8082 8085
 
-# 6. Start Supervisor
 CMD ["supervisord", "-c", "/etc/supervisord.conf"]

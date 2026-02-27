@@ -1,9 +1,9 @@
 import os
+from contextlib import AsyncExitStack
 from pathlib import Path
 from dotenv import load_dotenv
 from google.adk import Agent
-from google.adk.tools.mcp_tool import McpToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
+from google.adk.tools.mcp_tool import MCPToolset
 from mcp import StdioServerParameters
 from . import prompt
 
@@ -26,9 +26,10 @@ async def create_data_analyst_agent():
     Create a fresh data_analyst_agent with a live MCP toolset.
     Returns (agent, exit_stack) — caller must close the exit_stack when done.
     """
-    mcp_tools, exit_stack = await McpToolset.from_server(
-        connection_params=StdioConnectionParams(
-            server_params=StdioServerParameters(
+    exit_stack = AsyncExitStack()
+    mcp_tools = await exit_stack.enter_async_context(
+        MCPToolset(
+            connection_params=StdioServerParameters(
                 command="uvx",
                 args=["av-mcp", _api_key],
                 env=os.environ.copy(),
