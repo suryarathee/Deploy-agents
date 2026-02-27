@@ -13,7 +13,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 from google.genai import types
 
-from agent.agent import create_root_agent
+from agent.agent import root_agent
 
 # ── App setup ────────────────────────────────────────────────────────────────
 
@@ -51,11 +51,6 @@ async def run_agent_async(task_id: str, payload: AgentRequest):
     user_id = payload.userId
     session_id = payload.sessionId
     new_message = payload.newMessage
-
-    # Build a fresh agent tree (including live MCP sessions) for this run.
-    # Using an async exit stack ensures MCP subprocess connections are always
-    # cleanly shut down, even if an exception occurs mid-run.
-    root_agent, exit_stack = await create_root_agent()
 
     try:
         runner = Runner(
@@ -107,10 +102,6 @@ async def run_agent_async(task_id: str, payload: AgentRequest):
     except Exception as e:
         task_results[task_id] = {"status": "FAILURE", "result": str(e)}
         print(f"[TASK FAILED] {task_id} → {e}")
-
-    finally:
-        # Always close MCP subprocess connections
-        await exit_stack.aclose()
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────

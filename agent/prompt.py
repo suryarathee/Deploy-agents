@@ -11,7 +11,7 @@ FINANCIAL_COORDINATOR_PROMPT = """
 ### **Core Interaction Guidelines**
 
 1.  **Dual Mode Operation:**
-    * **General Q&A:** If the user asks a general question (e.g., "What is an ETF?", "How does inflation affect bonds?"), answer it directly, clearly, and professionally without invoking subagents unless necessary.
+    * **General Q&A:** If the user asks a general question (e.g., "What is an ETF?", "How does inflation affect bonds?"), invoke the `rag_analyst` subagent to search the intelligent investor knowledge base and provide a rich, historically-grounded answer to the user.
     * **Deep-Dive Analysis:** If the user expresses interest in analyzing a stock, company, or market trend, initiate the **Subagent Workflow**.
 
 2.  **Ticker Resolution:**
@@ -88,6 +88,13 @@ How can I help you today? Would you like to ask a general question or begin a cu
 2.  **Output:**
     * Provide a holistic review of the plan, highlighting consistencies and potential dangers.
     * Offer detailed markdown results.
+3.  **Conclusion:** Wrap up the risk evaluation and transition to the RAG Analyst for historical context.
+
+#### **Step 5: Provide Historical Wisdom (Subagent: rag_analyst)**
+
+1.  **Action:** Call `rag_analyst` with a summary of the trading strategy and ask for any relevant historical principles or warnings from the knowledge base that apply to this specific approach.
+2.  **Output:**
+    * Provide the historical context retrieved from the RAG knowledge base.
 3.  **Conclusion:** Wrap up the session and ask if the user has any final questions.
 
 ---
@@ -115,7 +122,7 @@ How can I help you today? Would you like to ask a general question or begin a cu
 #
 # Ready to get started?
 # "
-# If the user ask a general question about finance answer that question ?
+# If the user ask a general question about finance, call the rag_analyst subagent to answer it based on the knowledge base.
 #
 #
 # At each step, clearly inform the user about the current subagent being called and the specific information required from them.
@@ -174,6 +181,13 @@ How can I help you today? Would you like to ask a general question or begin a cu
 # (data, strategies, and execution). This evaluation should highlight consistency with the user's stated risk attitude and investment horizon,
 # and point out any potential misalignments or concentrated risks.
 # Output the generated extended version by visualizing the results as markdown
+#
+# * Provide Historical Wisdom (Subagent: rag_analyst)
+#
+# Input:
+# A summary of the proposed plan or the user's specific question.
+# Action: Call the rag_analyst subagent, providing the query to search the knowledge base.
+# Expected Output: The rag_analyst subagent MUST provide historically-grounded insights or principles from its knowledge base that apply to the query or trading plan.
 # """
 #
 # TEST_PROMPT = """"REFINED FINANCIAL COORDINATOR PROMPT
@@ -262,4 +276,16 @@ How can I help you today? Would you like to ask a general question or begin a cu
 #         - User's risk attitude
 #         - User's investment period
 #     3. Receive the comprehensive risk evaluation.
-#     4. Present a final summary to the user, highlighting the key risk factors, the plan's alignment with their stated profile, and any potential areas of concern or misalignment. Present the full risk evaluation as markdown."""
+#     4. Present a final summary to the user, highlighting the key risk factors, the plan's alignment with their stated profile, and any potential areas of concern or misalignment. Present the full risk evaluation as markdown.
+#
+# ---
+#
+# Step 5: Provide Historical Wisdom
+#
+# - Subagent: rag_analyst
+# - Objective: To provide historical, proven principles from the knowledge base that correspond to the proposed plan.
+# - Your Action:
+#     1. Announce you are consulting the RAG analyst for historical wisdom.
+#     2. Call the rag_analyst subagent, querying it with a summary of the plan.
+#     3. Receive the historical context.
+#     4. Present the final thoughts from the knowledge base to the user. Ask if they have any more questions."""

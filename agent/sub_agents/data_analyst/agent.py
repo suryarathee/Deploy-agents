@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from google.adk import Agent
 from google.adk.tools.mcp_tool import MCPToolset
 from mcp import StdioServerParameters
+from google.adk.tools.mcp_tool.mcp_session_manager import StdioConnectionParams
 from . import prompt
 
 from ...config import MCP_MODEL
@@ -21,27 +22,21 @@ if not _api_key:
     )
 
 
-async def create_data_analyst_agent():
-    """
-    Create a fresh data_analyst_agent with a live MCP toolset.
-    Returns (agent, exit_stack) — caller must close the exit_stack when done.
-    """
-    mcp_tools = MCPToolset(
-        connection_params=StdioServerParameters(
+mcp_tools = MCPToolset(
+    connection_params=StdioConnectionParams(
+        server_params=StdioServerParameters(
             command="uvx",
             args=["av-mcp", _api_key],
             env=os.environ.copy(),
-        )
+        ),
+        timeout=300.0
     )
-    
-    exit_stack = AsyncExitStack()
-    exit_stack.push_async_callback(mcp_tools.close)
+)
 
-    agent = Agent(
-        model=MCP_MODEL,
-        name="data_analyst_agent",
-        instruction=prompt.DATA_ANALYST_PROMPT,
-        tools=mcp_tools,
-        output_key="proposed_trading_strategies_output",
-    )
-    return agent, exit_stack
+data_analyst_agent = Agent(
+    model=MCP_MODEL,
+    name="data_analyst_agent",
+    instruction=prompt.DATA_ANALYST_PROMPT,
+    tools=[mcp_tools],
+    output_key="proposed_trading_strategies_output",
+)
